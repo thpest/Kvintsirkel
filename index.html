@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kvintsirkelen – akkorder, skalaer og lyd</title>
+<style>
+  :root {
+    --bg: #0f1320;
+    --panel: #1a2034;
+    --panel2: #232a44;
+    --accent: #f5b942;
+    --accent2: #4ea1ff;
+    --text: #e8ecf5;
+    --muted: #9aa3bd;
+    --dur: #3a6ea5;
+    --moll: #8a5a9e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(1200px 800px at 70% -10%, #1c2440 0%, var(--bg) 60%), var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    text-align: center;
+    padding: 28px 16px 10px;
+  }
+  header h1 { margin: 0; font-size: 1.7rem; letter-spacing: .5px; }
+  header p { margin: 6px 0 0; color: var(--muted); }
+  .wrap {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  @media (max-width: 820px) { .wrap { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--panel);
+    border: 1px solid #2c344f;
+    border-radius: 14px;
+    padding: 18px;
+  }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: .8rem; color: var(--muted); }
+  select, input[type=range] { accent-color: var(--accent); }
+  select {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid #3a4366;
+    border-radius: 8px; padding: 8px 10px; font-size: 1rem;
+  }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; color: var(--accent); }
+  .chord-grid { display: grid; gap: 8px; }
+  .chord-row {
+    display: grid; grid-template-columns: 56px 1fr auto;
+    align-items: center; gap: 10px;
+    background: var(--panel2); border-radius: 10px; padding: 10px 12px;
+  }
+  .roman { font-weight: 700; color: var(--accent2); font-size: 1.05rem; }
+  .chord-name { font-size: 1.2rem; font-weight: 600; }
+  .chord-sub { font-size: .78rem; color: var(--muted); }
+  .chord-notes { font-size: .82rem; color: var(--accent); letter-spacing: .5px; margin-top: 2px; }
+  .switch { display: flex; align-items: center; gap: 7px; font-size: .9rem; color: var(--text); cursor: pointer; }
+  .switch input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .hint { font-size: .82rem; color: var(--muted); margin: -6px 0 12px; }
+  .chord-row { cursor: pointer; transition: outline .12s; }
+  .chord-row.sel { outline: 2px solid var(--accent); }
+  .diagram { margin: 4px 0 6px; }
+  .diagram:empty { display: none; }
+  .diag-card { background: var(--panel2); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .diag-title { font-weight: 700; color: var(--accent); margin-bottom: 10px; }
+  .diag-flex { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+  .diag-block { text-align: center; }
+  .diag-block h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); font-weight: 600; }
+  .diag-block .cap { font-size: .7rem; color: var(--muted); margin-top: 6px; max-width: 220px; }
+  .copied { color: var(--accent2) !important; }
+  button {
+    background: var(--accent); color: #1a1300; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: .92rem;
+    font-weight: 600; cursor: pointer; transition: transform .05s, filter .15s;
+  }
+  button:hover { filter: brightness(1.08); }
+  button:active { transform: scale(.96); }
+  button.ghost { background: transparent; color: var(--accent2); border: 1px solid #3a4366; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; align-items: center; }
+  .mod-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .mod-chip {
+    background: var(--panel2); border: 1px solid #3a4366; color: var(--text);
+    border-radius: 20px; padding: 6px 14px; cursor: pointer; font-size: .9rem;
+  }
+  .mod-chip:hover { border-color: var(--accent); }
+  .mod-chip small { color: var(--muted); }
+  svg text { user-select: none; }
+  .seg { cursor: pointer; transition: opacity .15s; }
+  .seg:hover { opacity: .85; }
+  footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎵 Kvintsirkelen</h1>
+  <p>Velg toneart og modus – klikk på en akkord eller på sirkelen for å høre den.</p>
+</header>
+
+<div class="wrap">
+  <!-- VENSTRE: sirkel + kontroller -->
+  <section class="panel">
+    <div class="controls">
+      <div class="field">
+        <label for="root">Grunntone</label>
+        <select id="root"></select>
+      </div>
+      <div class="field">
+        <label for="mode">Modus</label>
+        <select id="mode">
+          <option value="dur">Dur</option>
+          <option value="moll">Moll (naturlig)</option>
+          <option value="harmonisk moll">Harmonisk moll</option>
+          <option value="dorisk">Dorisk</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin-top:14px;">
+      <svg id="circle" viewBox="0 0 340 340" width="100%" style="max-width:340px"></svg>
+    </div>
+  </section>
+
+  <!-- HØYRE: akkorder + modulasjoner -->
+  <section class="panel">
+    <h2 id="title">Akkorder i C-dur</h2>
+    <p class="hint">Klikk en akkord for å høre den og se grepet ↓</p>
+    <div class="chord-grid" id="chords"></div>
+
+    <div id="diagram" class="diagram"></div>
+
+    <div class="toolbar">
+      <button id="playScale">▶ Spill skala</button>
+      <button id="playProg" class="ghost">▶ Spill akkordrekke (I–IV–V–I)</button>
+      <button id="copyChords" class="ghost">📋 Kopier akkorder</button>
+    </div>
+    <div class="toolbar" style="margin-top:10px;">
+      <label class="switch"><input type="checkbox" id="seventh"> Septimakkorder (7)</label>
+      <label class="switch"><input type="checkbox" id="arp"> Arpeggio (tone for tone)</label>
+    </div>
+    <div class="toolbar" style="margin-top:10px;">
+      <div class="field" style="flex:1; min-width:170px;">
+        <label for="tempo">Tempo: <span id="tempoVal">100</span> BPM</label>
+        <input type="range" id="tempo" min="50" max="180" step="1" value="100">
+      </div>
+      <div class="field">
+        <label for="instr">Grep vises som</label>
+        <select id="instr">
+          <option value="begge">Piano + gitar</option>
+          <option value="piano">Bare piano</option>
+          <option value="gitar">Bare gitar</option>
+        </select>
+      </div>
+    </div>
+
+    <h2 style="margin-top:22px;">Mulige modulasjoner</h2>
+    <div class="mod-list" id="mods"></div>
+
+    <div class="toolbar" style="margin-top:18px;">
+      <div class="field">
+        <label for="wave">Lydtype</label>
+        <select id="wave">
+          <option value="triangle">Myk (triangle)</option>
+          <option value="sine">Ren (sine)</option>
+          <option value="sawtooth">Skarp (sawtooth)</option>
+          <option value="square">Orgel (square)</option>
+        </select>
+      </div>
+      <div class="field" style="flex:1; min-width:140px;">
+        <label for="vol">Volum</label>
+        <input type="range" id="vol" min="0" max="1" step="0.01" value="0.4">
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer>Laget fra <code>kvint.py</code> · Web Audio API · ingen installasjon nødvendig</footer>
+
+<script>
+// ---------- Musikkteori ----------
+const NOTE_SEMI = { C:0,"C#":1,Db:1,D:2,"D#":3,Eb:3,E:4,F:5,"F#":6,Gb:6,G:7,"G#":8,Ab:8,A:9,"A#":10,Bb:10,B:11 };
+const LETTERS = ["C","D","E","F","G","A","B"];
+const LETTER_SEMI = { C:0,D:2,E:4,F:5,G:7,A:9,B:11 };
+
+// Kvintsirkel-rekkefølge (med fin staving for hver toneart)
+const CIRCLE = ["C","G","D","A","E","B","F#","Db","Ab","Eb","Bb","F"];
+const REL_MINOR = ["A","E","B","F#","C#","G#","D#","Bb","F","C","G","D"]; // relativ moll-grunntone
+
+// Skalaintervaller (halvtoner fra grunntone) + akkordkvaliteter per trinn
+const MODES = {
+  "dur":            { steps:[0,2,4,5,7,9,11], qual:["maj","min","min","maj","maj","min","dim"], roman:["I","ii","iii","IV","V","vi","vii°"] },
+  "moll":           { steps:[0,2,3,5,7,8,10], qual:["min","dim","maj","min","min","maj","maj"], roman:["i","ii°","III","iv","v","VI","VII"] },
+  "harmonisk moll": { steps:[0,2,3,5,7,8,11], qual:["min","dim","aug","min","maj","maj","dim"], roman:["i","ii°","III+","iv","V","VI","vii°"] },
+  "dorisk":         { steps:[0,2,3,5,7,9,10], qual:["min","min","maj","maj","min","dim","maj"], roman:["i","ii","III","IV","v","vi°","VII"] },
+};
+
+const QUAL_SUFFIX = { maj:"", min:"m", dim:"dim", aug:"+" };
+const QUAL_LABEL = { maj:"dur", min:"moll", dim:"forminsket", aug:"forstørret" };
+
+// Treklangkvalitet ut fra ters- og kvintintervall
+function triadQuality(intervals){
+  return ({"4,7":"maj","3,7":"min","3,6":"dim","4,8":"aug"})[intervals[1]+","+intervals[2]] || "maj";
+}
+// Septimakkord: suffiks + etikett ut fra treklang + septimintervall
+function seventhInfo(triadQual, seventh){
+  return ({
+    "maj:11":{suf:"maj7",  lab:"stor septim"},
+    "maj:10":{suf:"7",     lab:"dominantseptim"},
+    "min:10":{suf:"m7",    lab:"moll-septim"},
+    "min:11":{suf:"m(maj7)",lab:"moll, stor septim"},
+    "dim:10":{suf:"m7♭5",  lab:"halvforminsket"},
+    "dim:9": {suf:"dim7",  lab:"helforminsket"},
+    "aug:11":{suf:"maj7♯5",lab:"forstørret, stor septim"},
+    "aug:10":{suf:"7♯5",   lab:"forstørret septim"},
+  })[triadQual+":"+seventh] || {suf:"7", lab:"septim"};
+}
+
+function parseRoot(name){
+  const m = name.match(/^([A-G])(b|#|bb|##)?$/);
+  const letter = m[1];
+  const acc = m[2] || "";
+  let semi = LETTER_SEMI[letter];
+  for (const ch of acc){ semi += (ch==="#"?1:-1); }
+  return { letterIdx: LETTERS.indexOf(letter), semi: ((semi%12)+12)%12 };
+}
+
+// Riktig staving: hver skala-bokstav brukes én gang
+function spell(letterIdx, targetSemi){
+  const letter = LETTERS[letterIdx % 7];
+  let diff = (targetSemi - LETTER_SEMI[letter] + 12) % 12;
+  if (diff > 6) diff -= 12; // velg nærmeste (±)
+  let acc = "";
+  if (diff > 0) acc = "#".repeat(diff);
+  else if (diff < 0) acc = "b".repeat(-diff);
+  return letter + acc;
+}
+
+// Bygg diatoniske akkorder. seventh=true gir firtoneakkorder (septimakkorder).
+function buildChords(rootName, mode, seventh=false){
+  const root = parseRoot(rootName);
+  const def = MODES[mode];
+  // Hele skalaen: riktig staving + halvtoner fra grunntone for hvert trinn
+  const scale = def.steps.map((interval, d) => ({
+    spell: spell(root.letterIdx + d, (root.semi + interval) % 12),
+    semi: interval,
+  }));
+  const offsets = seventh ? [0,2,4,6] : [0,2,4]; // tersstabling
+  return def.steps.map((interval, i) => {
+    const members = offsets.map(k => {
+      const idx = i + k, deg = idx % 7, oct = Math.floor(idx/7) * 12;
+      return { spell: scale[deg].spell, iv: (scale[deg].semi + oct) - interval };
+    });
+    const intervals = members.map(m => m.iv);
+    const tq = triadQuality(intervals);
+    let suffix = QUAL_SUFFIX[tq], qualLabel = QUAL_LABEL[tq];
+    if (seventh){ const s = seventhInfo(tq, intervals[3]); suffix = s.suf; qualLabel = s.lab; }
+    return {
+      roman: def.roman[i] + (seventh ? "7" : ""),
+      name: scale[i].spell + suffix,
+      qualLabel,
+      notes: members.map(m => m.spell),
+      rootSemi: (root.semi + interval) % 12,
+      intervals,
+    };
+  });
+}
+
+// ---------- Lyd ----------
+let audioCtx = null;
+function ctx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+function freq(midi){ return 440 * Math.pow(2,(midi-69)/12); }
+function beat(){ return 60 / parseFloat(document.getElementById("tempo").value); } // sekunder per slag
+
+function playNotes(midiNotes, when=0, dur=0.9){
+  const ac = ctx();
+  const t0 = ac.currentTime + when;
+  const wave = document.getElementById("wave").value;
+  const vol = parseFloat(document.getElementById("vol").value) / Math.max(1, midiNotes.length*0.7);
+  midiNotes.forEach(m => {
+    const osc = ac.createOscillator();
+    const g = ac.createGain();
+    osc.type = wave;
+    osc.frequency.value = freq(m);
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0008, t0 + dur);
+    osc.connect(g).connect(ac.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.05);
+  });
+}
+
+// rootSemi (0-11) -> midi i oktav 4 (C4 = 60)
+function chordMidi(chord){ return chord.intervals.map(iv => 60 + chord.rootSemi + iv); }
+
+function playChord(chord, when=0){
+  const notes = chordMidi(chord);
+  if (document.getElementById("arp").checked){
+    const step = beat() / 2;                                       // åttendedeler
+    notes.forEach((n,i) => playNotes([n], when + i*step, step*1.6));// tone for tone
+    playNotes(notes, when + notes.length*step + 0.05, beat());     // så hele akkorden
+  } else {
+    playNotes(notes, when, beat()*1.4);
+  }
+}
+
+// ---------- UI ----------
+const rootSel = document.getElementById("root");
+const modeSel = document.getElementById("mode");
+CIRCLE.forEach(n => { const o=document.createElement("option"); o.value=n; o.textContent=n; rootSel.appendChild(o); });
+
+function render(){
+  const rootName = rootSel.value;
+  const mode = modeSel.value;
+  const seventh = document.getElementById("seventh").checked;
+  const chords = buildChords(rootName, mode, seventh);
+
+  const modeLabel = { "dur":"-dur","moll":"-moll","harmonisk moll":" harmonisk moll","dorisk":" dorisk" }[mode];
+  document.getElementById("title").textContent = "Akkorder i " + rootName + modeLabel;
+
+  // Akkordliste
+  const box = document.getElementById("chords");
+  box.innerHTML = "";
+  chords.forEach((c,i) => {
+    const row = document.createElement("div");
+    row.className = "chord-row";
+    row.innerHTML = `<span class="roman">${c.roman}</span>
+      <span><span class="chord-name">${c.name}</span>
+      <div class="chord-notes">${c.notes.join(" – ")}</div>
+      <span class="chord-sub">${c.qualLabel}</span></span>
+      <button>▶ Spill</button>`;
+    row.onclick = () => selectChord(i, true);
+    box.appendChild(row);
+  });
+  currentChords = chords;
+  if (selectedIdx >= chords.length) selectedIdx = 0;
+  selectChord(selectedIdx, false);
+
+  // Modulasjoner: subdominant, dominant, relativ
+  const idx = CIRCLE.indexOf(rootName);
+  const mods = [
+    { label:"Dominant (kvint opp)", key: CIRCLE[(idx+1)%12], chords: buildChords(CIRCLE[(idx+1)%12], mode, seventh) },
+    { label:"Subdominant (kvint ned)", key: CIRCLE[(idx+11)%12], chords: buildChords(CIRCLE[(idx+11)%12], mode, seventh) },
+  ];
+  if (mode === "dur") mods.push({ label:"Relativ moll", key: REL_MINOR[idx]+"m", chords: buildChords(REL_MINOR[idx], "moll", seventh) });
+
+  const modBox = document.getElementById("mods");
+  modBox.innerHTML = "";
+  mods.forEach(m => {
+    const chip = document.createElement("div");
+    chip.className = "mod-chip";
+    chip.innerHTML = `${m.key} <small>– ${m.label}</small>`;
+    chip.onclick = () => { playChord(m.chords[0]); };
+    modBox.appendChild(chip);
+  });
+
+  drawCircle(rootName);
+}
+
+// Spill skala (kun grunntonene oppover)
+document.getElementById("playScale").onclick = () => {
+  const chords = buildChords(rootSel.value, modeSel.value);
+  const root = chords[0].rootSemi;
+  const steps = MODES[modeSel.value].steps.concat([12]);
+  const step = beat()/2;
+  steps.forEach((iv,i) => playNotes([60+root+iv], i*step, step*0.95));
+};
+
+// Spill akkordrekke I–IV–V–I (trinn 0,3,4,0)
+document.getElementById("playProg").onclick = () => {
+  const c = buildChords(rootSel.value, modeSel.value, document.getElementById("seventh").checked);
+  const arp = document.getElementById("arp").checked;
+  const gap = beat() * (arp ? 2.6 : 1.1);
+  [c[0],c[3],c[4],c[0]].forEach((ch,i) => playChord(ch, i*gap));
+};
+
+// ---------- Valgt akkord + grep-diagram ----------
+let currentChords = [], selectedIdx = 0;
+
+function noteSemi(name){
+  const m = name.match(/^([A-G])(b+|#+)?$/); if(!m) return 0;
+  let s = LETTER_SEMI[m[1]];
+  if (m[2]) for (const ch of m[2]) s += (ch==="#"?1:-1);
+  return ((s%12)+12)%12;
+}
+function memberLabel(pc, c){ for (const n of c.notes){ if (noteSemi(n)===pc) return n; } return ""; }
+
+function selectChord(idx, doPlay){
+  selectedIdx = idx;
+  const c = currentChords[idx];
+  [...document.querySelectorAll(".chord-row")].forEach((r,i)=> r.classList.toggle("sel", i===idx));
+  renderDiagram(c);
+  if (doPlay) playChord(c);
+}
+
+function renderDiagram(c){
+  if (!c) { document.getElementById("diagram").innerHTML=""; return; }
+  const mode = document.getElementById("instr").value;
+  let inner = "";
+  if (mode!=="gitar") inner += `<div class="diag-block"><h3>Piano</h3>${pianoSVG(c)}</div>`;
+  if (mode!=="piano"){
+    const grip = resolveGrip(c);
+    inner += grip
+      ? `<div class="diag-block"><h3>Gitar – ${grip.label}</h3>${chordGripSVG(grip, c.rootSemi%12)}
+         <div class="cap">Tall = finger · O = løs streng · × = demp · gull = grunntone</div></div>`
+      : `<div class="diag-block"><h3>Gitar – toner på bånd 0–5</h3>${guitarSVG(c)}
+         <div class="cap">Uvanlig akkord – viser alle toner på gripebrettet i stedet for ett grep.</div></div>`;
+  }
+  document.getElementById("diagram").innerHTML =
+    `<div class="diag-card"><div class="diag-title">Grep: ${c.name}
+      <span style="color:var(--muted);font-weight:400">(${c.notes.join(" – ")})</span></div>
+      <div class="diag-flex">${inner}</div></div>`;
+}
+
+function pianoSVG(c){
+  const set = new Set(c.intervals.map(iv => (c.rootSemi+iv)%12));
+  const rootPC = c.rootSemi%12;
+  const w=24,h=96, bw=14,bh=60;
+  const whites=[0,2,4,5,7,9,11];
+  let s="";
+  for(let o=0;o<2;o++) for(let i=0;i<7;i++){
+    const x=(o*7+i)*w, pc=whites[i], on=set.has(pc);
+    const fill = on ? (pc===rootPC?"var(--accent)":"var(--accent2)") : "#f3f3f7";
+    s+=`<rect x="${x}" y="0" width="${w-1}" height="${h}" rx="3" fill="${fill}" stroke="#9aa3bd"/>`;
+    if(on) s+=`<text x="${x+w/2}" y="${h-8}" text-anchor="middle" font-size="9" font-weight="700" fill="#10131f">${memberLabel(pc,c)}</text>`;
+  }
+  const blacks=[{a:0,pc:1},{a:1,pc:3},{a:3,pc:6},{a:4,pc:8},{a:5,pc:10}];
+  for(let o=0;o<2;o++) for(const b of blacks){
+    const x=(o*7+b.a)*w + w - bw/2, on=set.has(b.pc);
+    const fill = on ? (b.pc===rootPC?"var(--accent)":"var(--accent2)") : "#1b1f2e";
+    s+=`<rect x="${x}" y="0" width="${bw}" height="${bh}" rx="2" fill="${fill}" stroke="#000"/>`;
+  }
+  const W=14*w;
+  return `<svg viewBox="0 0 ${W} ${h}" width="${Math.min(W,330)}" style="max-width:100%">${s}</svg>`;
+}
+
+function guitarSVG(c){
+  const set = new Set(c.intervals.map(iv => (c.rootSemi+iv)%12));
+  const rootPC = c.rootSemi%12;
+  const open=[4,9,2,7,11,4], lbl=["E","A","D","G","B","e"]; // lav E → høy e
+  const FR=5, sx=24, sy=26, mx=22, top=28;
+  const W=mx*2+5*sx, H=top+FR*sy+20;
+  let s="";
+  s+=`<line x1="${mx}" y1="${top}" x2="${mx+5*sx}" y2="${top}" stroke="#e8ecf5" stroke-width="4"/>`;
+  for(let f=1;f<=FR;f++){ const y=top+f*sy;
+    s+=`<line x1="${mx}" y1="${y}" x2="${mx+5*sx}" y2="${y}" stroke="#3a4366"/>`;
+    s+=`<text x="${mx-9}" y="${y-sy/2+4}" text-anchor="end" font-size="9" fill="#9aa3bd">${f}</text>`;
+  }
+  for(let i=0;i<6;i++){ const x=mx+i*sx;
+    s+=`<line x1="${x}" y1="${top}" x2="${x}" y2="${top+FR*sy}" stroke="#3a4366"/>`;
+    s+=`<text x="${x}" y="${top+FR*sy+15}" text-anchor="middle" font-size="9" fill="#9aa3bd">${lbl[i]}</text>`;
+    let any=false;
+    const opc=open[i]%12;
+    if(set.has(opc)){ any=true; const col=opc===rootPC?"var(--accent)":"var(--accent2)";
+      s+=`<circle cx="${x}" cy="${top-13}" r="6" fill="none" stroke="${col}" stroke-width="2.5"/>`; }
+    for(let f=1;f<=FR;f++){ const pc=(open[i]+f)%12; if(set.has(pc)){ any=true;
+      const col=pc===rootPC?"var(--accent)":"var(--accent2)", y=top+(f-0.5)*sy;
+      s+=`<circle cx="${x}" cy="${y}" r="9" fill="${col}"/>`;
+      s+=`<text x="${x}" y="${y+3}" text-anchor="middle" font-size="8" font-weight="700" fill="#10131f">${memberLabel(pc,c)}</text>`;
+    }}
+    if(!any) s+=`<text x="${x}" y="${top-9}" text-anchor="middle" font-size="12" fill="#9aa3bd">×</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%">${s}</svg>`;
+}
+
+// ---------- Ekte gitargrep ----------
+// frets: lav E→høy e (null=demp, 0=løs streng). fingers: 0=ingen.
+const OPEN_CHORDS = {
+  "C":    {frets:[null,3,2,0,1,0], fingers:[0,3,2,0,1,0]},
+  "Cmaj7":{frets:[null,3,2,0,0,0], fingers:[0,3,2,0,0,0]},
+  "C7":   {frets:[null,3,2,3,1,0], fingers:[0,3,2,4,1,0]},
+  "A":    {frets:[null,0,2,2,2,0], fingers:[0,0,1,2,3,0]},
+  "Am":   {frets:[null,0,2,2,1,0], fingers:[0,0,2,3,1,0]},
+  "A7":   {frets:[null,0,2,0,2,0], fingers:[0,0,2,0,3,0]},
+  "Amaj7":{frets:[null,0,2,1,2,0], fingers:[0,0,3,1,2,0]},
+  "Am7":  {frets:[null,0,2,0,1,0], fingers:[0,0,2,0,1,0]},
+  "G":    {frets:[3,2,0,0,0,3],    fingers:[2,1,0,0,0,3]},
+  "G7":   {frets:[3,2,0,0,0,1],    fingers:[3,2,0,0,0,1]},
+  "E":    {frets:[0,2,2,1,0,0],    fingers:[0,2,3,1,0,0]},
+  "Em":   {frets:[0,2,2,0,0,0],    fingers:[0,2,3,0,0,0]},
+  "E7":   {frets:[0,2,0,1,0,0],    fingers:[0,2,0,1,0,0]},
+  "Em7":  {frets:[0,2,0,0,0,0],    fingers:[0,2,0,0,0,0]},
+  "Emaj7":{frets:[0,2,1,1,0,0],    fingers:[0,3,1,2,0,0]},
+  "D":    {frets:[null,null,0,2,3,2], fingers:[0,0,0,1,3,2]},
+  "Dm":   {frets:[null,null,0,2,3,1], fingers:[0,0,0,2,3,1]},
+  "D7":   {frets:[null,null,0,2,1,2], fingers:[0,0,0,2,1,3]},
+  "Dmaj7":{frets:[null,null,0,2,2,2], fingers:[0,0,0,1,2,3]},
+  "Dm7":  {frets:[null,null,0,2,1,1], fingers:[0,0,0,2,1,1]},
+  "Fmaj7":{frets:[null,null,3,2,1,0], fingers:[0,0,3,2,1,0]},
+  "B7":   {frets:[null,2,1,2,0,2], fingers:[0,2,1,3,0,4]},
+};
+// Flyttbare barré-former (offset fra grunnbånd). root=streng grunntonen ligger på.
+const MOVABLE = {
+  "maj": [ {root:0, off:[0,2,2,1,0,0],    fing:[1,3,4,2,1,1]},
+           {root:1, off:[null,0,2,2,2,0], fing:[0,1,3,4,2,1]} ],
+  "min": [ {root:0, off:[0,2,2,0,0,0],    fing:[1,3,4,1,1,1]},
+           {root:1, off:[null,0,2,2,1,0], fing:[0,1,3,4,2,1]} ],
+  "7":   [ {root:0, off:[0,2,0,1,0,0],    fing:[1,3,1,2,1,1]},
+           {root:1, off:[null,0,2,0,2,0], fing:[0,1,3,1,4,1]} ],
+  "maj7":[ {root:0, off:[0,2,1,1,0,0],    fing:[1,3,2,2,1,1]},
+           {root:1, off:[null,0,2,1,2,0], fing:[0,1,3,2,4,1]} ],
+  "m7":  [ {root:0, off:[0,2,0,0,0,0],    fing:[1,3,1,1,1,1]},
+           {root:1, off:[null,0,2,0,1,0], fing:[0,1,3,1,2,1]} ],
+  "mM7": [ {root:0, off:[0,2,1,0,0,0],    fing:[1,3,2,1,1,1]},
+           {root:1, off:[null,0,2,1,1,0], fing:[0,1,3,2,2,1]} ],
+  "m7b5":[ {root:1, off:[null,0,1,0,1,null], fing:[0,2,3,1,4,0]} ],
+};
+
+function classify(c){
+  const tq = triadQuality(c.intervals);          // maj/min/dim/aug
+  if (c.intervals.length===3) return tq==="maj"?"maj":tq==="min"?"min":tq;
+  return ({
+    "maj:11":"maj7","maj:10":"7","min:10":"m7","min:11":"mM7",
+    "dim:10":"m7b5","dim:9":"dim7","aug:11":"maj7#5","aug:10":"7#5"
+  })[tq+":"+c.intervals[3]] || "maj";
+}
+
+function resolveGrip(c){
+  if (OPEN_CHORDS[c.name]) return { ...OPEN_CHORDS[c.name], label:"åpent grep" };
+  const forms = MOVABLE[classify(c)];
+  if (!forms) return null;                        // ukjent → fall tilbake til toneoversikt
+  let best = null;
+  for (const f of forms){
+    const openPC = f.root===0 ? 4 : 9;
+    const base = ((((c.rootSemi%12) - openPC) % 12) + 12) % 12;
+    const frets = f.off.map(o => o==null ? null : o+base);
+    if (!best || base < best.base) best = { frets, fingers:f.fing, base };
+  }
+  const minF = Math.min(...best.frets.filter(f=>f!=null && f>0).concat([99]));
+  const startFret = minF<=4 ? 1 : minF;
+  best.label = best.base===0 ? "åpent grep" : (startFret>1 ? `barré (${startFret}. bånd)` : "barré");
+  return best;
+}
+
+function chordGripSVG(grip, rootPC){
+  const open=[4,9,2,7,11,4], lbl=["E","A","D","G","B","e"];
+  const frets=grip.frets, fingers=grip.fingers||[0,0,0,0,0,0];
+  const fretted = frets.filter(f=>f!=null && f>0);
+  const minF = fretted.length?Math.min(...fretted):1, maxF = fretted.length?Math.max(...fretted):1;
+  const startFret = minF<=4 ? 1 : minF;
+  const rows = Math.max(4, maxF-startFret+1);
+  const sx=24, sy=26, mx=24, top=30, W=mx*2+5*sx, H=top+rows*sy+22;
+  let s="";
+  if (startFret===1) s+=`<rect x="${mx}" y="${top-4}" width="${5*sx}" height="4" fill="#e8ecf5"/>`;
+  else s+=`<text x="${mx+5*sx+5}" y="${top+sy-7}" font-size="11" fill="#9aa3bd">${startFret}.bånd</text>`;
+  for (let r=0;r<=rows;r++){ if(startFret===1 && r===0) continue; const y=top+r*sy;
+    s+=`<line x1="${mx}" y1="${y}" x2="${mx+5*sx}" y2="${y}" stroke="#3a4366"/>`; }
+  for (let i=0;i<6;i++){ const x=mx+i*sx;
+    s+=`<line x1="${x}" y1="${top}" x2="${x}" y2="${top+rows*sy}" stroke="#3a4366"/>`;
+    s+=`<text x="${x}" y="${top+rows*sy+15}" text-anchor="middle" font-size="9" fill="#9aa3bd">${lbl[i]}</text>`; }
+  // barré-strek (finger 1 over ≥2 strenger på samme bånd)
+  const grp={};
+  for (let i=0;i<6;i++) if (fingers[i]===1 && frets[i]>0){ (grp[frets[i]]=grp[frets[i]]||[]).push(i); }
+  for (const fr in grp){ const a=grp[fr]; if (a.length>=2){
+    const x1=mx+Math.min(...a)*sx, x2=mx+Math.max(...a)*sx, y=top+(fr-startFret+0.5)*sy;
+    s+=`<rect x="${x1-7}" y="${y-9}" width="${x2-x1+14}" height="18" rx="9" fill="var(--accent2)" opacity="0.5"/>`; } }
+  for (let i=0;i<6;i++){ const x=mx+i*sx, f=frets[i];
+    if (f==null){ s+=`<text x="${x}" y="${top-10}" text-anchor="middle" font-size="12" fill="#9aa3bd">×</text>`; continue; }
+    if (f===0){ s+=`<circle cx="${x}" cy="${top-12}" r="6" fill="none" stroke="#9aa3bd" stroke-width="2"/>`; continue; }
+    const pc=(open[i]+f)%12, y=top+(f-startFret+0.5)*sy;
+    s+=`<circle cx="${x}" cy="${y}" r="9" fill="${pc===rootPC?'var(--accent)':'var(--accent2)'}"/>`;
+    if (fingers[i]>0) s+=`<text x="${x}" y="${y+3}" text-anchor="middle" font-size="9" font-weight="700" fill="#10131f">${fingers[i]}</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" width="${W}" style="max-width:100%">${s}</svg>`;
+}
+
+// ---------- Kopier akkorder ----------
+document.getElementById("copyChords").onclick = (e) => {
+  const label = {dur:"-dur",moll:"-moll","harmonisk moll":" harmonisk moll",dorisk:" dorisk"}[modeSel.value];
+  const oneLine = currentChords.map(c=>c.name).join("  ");
+  const detail = currentChords.map(c=>`${c.roman}: ${c.name}  (${c.notes.join("-")})`).join("\n");
+  const text = `${rootSel.value}${label}\n${oneLine}\n\n${detail}`;
+  const b=e.target, old="📋 Kopier akkorder";
+  const ok = ()=>{ b.textContent="✓ Kopiert!"; b.classList.add("copied"); setTimeout(()=>{ b.textContent=old; b.classList.remove("copied"); }, 1400); };
+  const fallback = ()=>{ // virker også på file://
+    const ta=document.createElement("textarea"); ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); ok(); } catch(_){ b.textContent="Kopier manuelt"; }
+    document.body.removeChild(ta);
+  };
+  if (navigator.clipboard && window.isSecureContext)
+    navigator.clipboard.writeText(text).then(ok, fallback);
+  else fallback();
+};
+
+// ---------- Tempo + instrument-valg ----------
+document.getElementById("tempo").oninput = (e)=> document.getElementById("tempoVal").textContent = e.target.value;
+document.getElementById("instr").onchange = ()=> renderDiagram(currentChords[selectedIdx]);
+
+// ---------- Kvintsirkel (SVG) ----------
+function drawCircle(activeName){
+  const svg = document.getElementById("circle");
+  const cx=170, cy=170, rO=160, rI=108, rInner=66;
+  const idx = CIRCLE.indexOf(activeName);
+  const neighbors = [(idx+1)%12, (idx+11)%12];
+  let html = "";
+  for (let i=0;i<12;i++){
+    const a0 = (i-0.5)/12*2*Math.PI - Math.PI/2;
+    const a1 = (i+0.5)/12*2*Math.PI - Math.PI/2;
+    const mid = i/12*2*Math.PI - Math.PI/2;
+    const active = i===idx;
+    const neigh = neighbors.includes(i);
+    // ytre (dur)
+    html += sector(cx,cy,rI,rO,a0,a1, active?"#f5b942":(neigh?"#5d7fb0":"var(--dur)"), "dur"+i);
+    // indre (moll)
+    html += sector(cx,cy,rInner,rI,a0,a1, active&&modeSel.value!=="dur"?"#caa0dd":"var(--moll)", "moll"+i);
+    // tekst dur
+    const tx=cx+Math.cos(mid)*((rI+rO)/2), ty=cy+Math.sin(mid)*((rI+rO)/2);
+    html += `<text x="${tx}" y="${ty+5}" text-anchor="middle" fill="#fff" font-size="15" font-weight="700">${CIRCLE[i]}</text>`;
+    const mx=cx+Math.cos(mid)*((rInner+rI)/2), my=cy+Math.sin(mid)*((rInner+rI)/2);
+    html += `<text x="${mx}" y="${my+4}" text-anchor="middle" fill="#e8ddf2" font-size="11">${REL_MINOR[i]}m</text>`;
+  }
+  html += `<circle cx="${cx}" cy="${cy}" r="${rInner-2}" fill="var(--panel2)"/>`;
+  html += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="var(--accent)" font-size="13">klikk</text>`;
+  html += `<text x="${cx}" y="${cy+14}" text-anchor="middle" fill="var(--muted)" font-size="11">en toneart</text>`;
+  svg.innerHTML = html;
+  // klikk-håndtering
+  for (let i=0;i<12;i++){
+    const durEl = svg.querySelector("#dur"+i);
+    const mollEl = svg.querySelector("#moll"+i);
+    if(durEl) durEl.onclick = () => { rootSel.value=CIRCLE[i]; modeSel.value="dur"; render(); playChord(buildChords(CIRCLE[i],"dur")[0]); };
+    if(mollEl) mollEl.onclick = () => { rootSel.value=REL_MINOR[i]; modeSel.value="moll"; syncRootForMinor(REL_MINOR[i]); render(); playChord(buildChords(REL_MINOR[i],"moll")[0]); };
+  }
+}
+// moll-grunntoner finnes ikke alltid i CIRCLE-listen; legg til ved behov
+function syncRootForMinor(name){
+  if (![...rootSel.options].some(o=>o.value===name)){
+    const o=document.createElement("option"); o.value=name; o.textContent=name; rootSel.appendChild(o);
+  }
+  rootSel.value=name;
+}
+
+function sector(cx,cy,r1,r2,a0,a1,fill,id){
+  const p = (r,a)=>[cx+Math.cos(a)*r, cy+Math.sin(a)*r];
+  const [x1,y1]=p(r2,a0),[x2,y2]=p(r2,a1),[x3,y3]=p(r1,a1),[x4,y4]=p(r1,a0);
+  return `<path id="${id}" class="seg" fill="${fill}" stroke="#0f1320" stroke-width="2"
+    d="M${x1} ${y1} A${r2} ${r2} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${r1} ${r1} 0 0 0 ${x4} ${y4} Z"/>`;
+}
+
+rootSel.onchange = render;
+modeSel.onchange = render;
+document.getElementById("seventh").onchange = render;
+render();
+</script>
+</body>
+</html>
