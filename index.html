@@ -95,9 +95,9 @@
   }
   .mod-chip:hover { border-color: var(--accent); }
   .mod-chip small { color: var(--muted); }
-  svg text { user-select: none; }
+  svg text { user-select: none; pointer-events: none; }  /* klikk går gjennom til feltet under */
   .seg { cursor: pointer; transition: opacity .15s; }
-  .seg:hover { opacity: .85; }
+  .seg:hover { opacity: .82; }
   footer { text-align: center; color: var(--muted); font-size: .8rem; padding: 20px; }
 </style>
 </head>
@@ -277,7 +277,11 @@ function buildChords(rootName, mode, seventh=false){
 
 // ---------- Lyd ----------
 let audioCtx = null;
-function ctx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+function ctx(){
+  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(audioCtx.state === "suspended") audioCtx.resume();  // vekk lyden om nettleseren har dvalet den
+  return audioCtx;
+}
 function freq(midi){ return 440 * Math.pow(2,(midi-69)/12); }
 function beat(){ return 60 / parseFloat(document.getElementById("tempo").value); } // sekunder per slag
 
@@ -623,14 +627,23 @@ function drawCircle(activeName){
   html += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="var(--accent)" font-size="13">klikk</text>`;
   html += `<text x="${cx}" y="${cy+14}" text-anchor="middle" fill="var(--muted)" font-size="11">en toneart</text>`;
   svg.innerHTML = html;
-  // klikk-håndtering
-  for (let i=0;i<12;i++){
-    const durEl = svg.querySelector("#dur"+i);
-    const mollEl = svg.querySelector("#moll"+i);
-    if(durEl) durEl.onclick = () => { rootSel.value=CIRCLE[i]; modeSel.value="dur"; render(); playChord(buildChords(CIRCLE[i],"dur")[0]); };
-    if(mollEl) mollEl.onclick = () => { rootSel.value=REL_MINOR[i]; modeSel.value="moll"; syncRootForMinor(REL_MINOR[i]); render(); playChord(buildChords(REL_MINOR[i],"moll")[0]); };
-  }
 }
+
+// Én delegert klikk-lytter for hele hjulet (festes kun én gang, overlever ny innerHTML)
+document.getElementById("circle").addEventListener("click", (e) => {
+  const path = e.target.closest("path[id]");
+  if (!path) return;
+  const i = parseInt(path.id.replace(/\D/g,""), 10);
+  if (Number.isNaN(i)) return;
+  const sev = document.getElementById("seventh").checked;
+  if (path.id.startsWith("moll")){
+    modeSel.value = "moll"; syncRootForMinor(REL_MINOR[i]); render();
+    playChord(buildChords(REL_MINOR[i], "moll", sev)[0]);
+  } else {
+    rootSel.value = CIRCLE[i]; modeSel.value = "dur"; render();
+    playChord(buildChords(CIRCLE[i], "dur", sev)[0]);
+  }
+});
 // moll-grunntoner finnes ikke alltid i CIRCLE-listen; legg til ved behov
 function syncRootForMinor(name){
   if (![...rootSel.options].some(o=>o.value===name)){
